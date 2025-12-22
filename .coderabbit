@@ -1,0 +1,519 @@
+# CodeRabbit Configuration for OPA/Rego Policy Repositories
+# Place this file at the root of your OPA policy repository as .coderabbit.yaml
+
+version: 1.0
+
+# Language settings
+language: en-US
+
+# Early access features
+early_access: true
+
+# Review settings
+reviews:
+  # Review profile
+  profile: assertive  # More strict for policy repos
+  
+  # Request changes workflow
+  request_changes_workflow: true
+  
+  # High level summary
+  high_level_summary: true
+  
+  # Poem style for summaries
+  poem: false
+  
+  # Review status
+  review_status: true
+  
+  # Collapse walkthrough
+  collapse_walkthrough: false
+  
+  # Auto review
+  auto_review:
+    enabled: true
+    
+    # Ignore specific file patterns
+    ignore_patterns:
+      - "**/*.md"
+      - "**/LICENSE"
+      - "**/.gitignore"
+      - "**/CHANGELOG.md"
+      - "**/VERSION"
+    
+    # Auto-approve trivial changes
+    auto_approve:
+      enabled: true
+      conditions:
+        - type: "documentation"
+          max_files: 2
+  
+  # Tools to use
+  tools:
+    # OPA/Rego validation
+    opa:
+      enabled: true
+    
+    # YAML linting
+    yamllint:
+      enabled: true
+      rules:
+        line-length:
+          max: 120
+        indentation:
+          spaces: 2
+    
+    # Security scanning
+    security:
+      enabled: true
+
+# Path-specific instructions
+path_instructions:
+  # Rego policy files
+  - path: "policies/**/*.rego"
+    instructions: |
+      For OPA/Rego policy files, check:
+      
+      1. METADATA BLOCK (CRITICAL)
+         - Must have: title, description, severity, category, version
+         - Example:
+           ```rego
+           # METADATA
+           # title: Alert Label Requirements
+           # description: Ensures alerts have required labels
+           # severity: high
+           # category: monitoring
+           # version: 1.0.0
+           ```
+      
+      2. PACKAGE NAMING
+         - Must follow convention: kubernetes.admission.<category>.<policyname>
+         - Examples:
+           ✅ kubernetes.admission.victoriametrics.recordingrules
+           ✅ kubernetes.admission.robusta.alertlabels
+           ❌ test.mypolicy (too generic)
+      
+      3. FUTURE KEYWORDS
+         - Always import: import future.keywords.if
+         - Use 'if' keyword in rules
+         - Example:
+           ```rego
+           violation[{"msg": msg}] if {
+             condition
+             msg := "error message"
+           }
+           ```
+      
+      4. VIOLATION MESSAGES
+         - Must be clear and actionable
+         - Include context (resource name, expected format)
+         - Provide examples or suggestions
+         - Bad: "Invalid name"
+         - Good: "Recording rule 'my_metric' must follow format: level:metric:operations (example: namespace:requests:rate5m)"
+      
+      5. EDGE CASE HANDLING
+         - Check for missing/empty fields
+         - Handle null/undefined values
+         - Validate data types
+         - Example:
+           ```rego
+           team := object.get(rule.labels, "team", "")
+           team == ""  # Handles missing label
+           ```
+      
+      6. PERFORMANCE
+         - Avoid nested loops on unbounded data
+         - Use 'some' keyword for iteration
+         - Cache computed values
+         - Example of bad:
+           ```rego
+           # ❌ Expensive
+           violation[msg] {
+             pod := input.pods[_]
+             container := pod.containers[_]
+             volume := container.volumes[_]
+             # Nested loops on potentially large data
+           }
+           ```
+      
+      7. SECURITY
+         - Don't accidentally exempt critical resources
+         - Validate exemption logic carefully
+         - Check for logic errors that allow bypasses
+         - Example:
+           ```rego
+           # ⚠️ Dangerous - exempts everything!
+           not input.review.object.metadata.namespace in exempt_namespaces
+           # Should be:
+           input.review.object.metadata.namespace in exempt_namespaces
+           ```
+      
+      8. CONSTANTS AND SETS
+         - Use sets for lists: {"value1", "value2"}
+         - Define constants at top
+         - Example:
+           ```rego
+           valid_severities := {"critical", "high", "warning", "info"}
+           high_cardinality_labels := {"pod_ip", "node_ip", "instance_ip"}
+           ```
+      
+      Flag these issues:
+      - Missing METADATA block
+      - Unclear violation messages
+      - No future.keywords import
+      - Unhandled edge cases (missing fields)
+      - Performance issues (nested unbounded loops)
+      - Logic errors in exemptions
+  
+  # Rego test files
+  - path: "tests/**/*_test.rego"
+    instructions: |
+      For OPA/Rego test files, check:
+      
+      1. TEST NAMING
+         - Prefix with "test_"
+         - Be descriptive about what's tested
+         - Good: test_alert_without_severity_denied
+         - Bad: test_policy_1
+      
+      2. COVERAGE
+         - Test both positive and negative cases
+         - Test edge cases (empty values, missing fields)
+         - Test each violation type separately
+         - Example:
+           ```rego
+           test_pod_without_limits_denied {
+             input := {"review": {...}}
+             count(violation) > 0  # Should violate
+           }
+           
+           test_pod_with_limits_allowed {
+             input := {"review": {...}}
+             count(violation) == 0  # Should pass
+           }
+           ```
+      
+      3. INPUT FIXTURES
+         - Use realistic Kubernetes resource structures
+         - Include all required fields
+         - Test with actual resource shapes
+         - Bad:
+           ```rego
+           input := {"name": "test"}  # Too simple
+           ```
+         - Good:
+           ```rego
+           input := {"review": {
+             "kind": {"kind": "VMRule"},
+             "object": {
+               "metadata": {"name": "test"},
+               "spec": {"groups": [...]}
+             }
+           }}
+           ```
+      
+      4. ASSERTIONS
+         - Use specific assertions
+         - Test the actual violation structure
+         - Example:
+           ```rego
+           test_violation_has_correct_message {
+             violations := violation with input as test_input
+             some v in violations
+             contains(v.msg, "expected error text")
+           }
+           ```
+      
+      5. EDGE CASES TO TEST
+         - Missing required fields
+         - Empty strings vs undefined
+         - Null values
+         - Wrong data types
+         - Boundary conditions
+      
+      Flag these issues:
+      - Tests without negative cases
+      - Non-descriptive test names
+      - Unrealistic test fixtures
+      - Missing edge case tests
+      - Tests that don't actually assert violations
+  
+  # Constraint examples
+  - path: "examples/gatekeeper/*.yaml"
+    instructions: |
+      For Gatekeeper Constraint files, check:
+      
+      1. ENFORCEMENT ACTION
+         - Start with 'dryrun' or 'warn' for new policies
+         - Only use 'deny' after validation in non-prod
+         - Document the reasoning
+         - Example:
+           ```yaml
+           spec:
+             enforcementAction: dryrun  # Audit mode for initial rollout
+           ```
+      
+      2. RESOURCE MATCHING
+         - Be specific about kinds
+         - Include both apiGroups and kinds
+         - Document why resources are matched
+         - Example:
+           ```yaml
+           match:
+             kinds:
+               - apiGroups: ["operator.victoriametrics.com"]
+                 kinds: ["VMRule"]
+               - apiGroups: ["monitoring.coreos.com"]
+                 kinds: ["PrometheusRule"]
+           ```
+      
+      3. NAMESPACE EXEMPTIONS
+         - Document why namespaces are exempt
+         - Keep exemption list minimal
+         - Review exemptions regularly
+         - Example:
+           ```yaml
+           match:
+             excludedNamespaces:
+               - kube-system  # System components
+               - kube-public  # Public resources
+           ```
+      
+      4. PARAMETERS
+         - Use parameters for configurable values
+         - Document parameter purpose
+         - Provide examples
+      
+      Flag these issues:
+      - Using 'deny' without comment for new policies
+      - Overly broad matching (all kinds)
+      - Excessive namespace exemptions
+      - Missing documentation
+  
+  # Scripts
+  - path: "scripts/**/*.sh"
+    instructions: |
+      For shell scripts, check:
+      
+      1. ERROR HANDLING
+         - Use 'set -e' at top
+         - Check command exit codes
+         - Provide helpful error messages
+      
+      2. PREREQUISITES
+         - Check for required commands
+         - Fail fast if missing
+         - Provide installation instructions
+         - Example:
+           ```bash
+           if ! command -v opa &> /dev/null; then
+             echo "❌ OPA not installed"
+             echo "Install: curl -L -o opa ..."
+             exit 1
+           fi
+           ```
+      
+      3. USER FEEDBACK
+         - Show progress with echo statements
+         - Use clear status indicators (✅ ❌ ⚠️)
+         - Explain what's happening
+      
+      4. DOCUMENTATION
+         - Add usage examples at top
+         - Document expected inputs
+         - Show example output
+
+# Custom review instructions
+custom_review_instructions: |
+  This is an OPA policy repository for Kubernetes admission control.
+  
+  CRITICAL FOCUS AREAS:
+  
+  1. POLICY CORRECTNESS
+     - Policies must correctly identify violations
+     - No false positives (blocking valid resources)
+     - No false negatives (allowing invalid resources)
+     - Logic must be sound and well-tested
+  
+  2. OPERATIONAL SAFETY
+     - Policies should not break existing workloads
+     - Start with audit mode (dryrun)
+     - Provide clear error messages for developers
+     - Include remediation guidance
+  
+  3. PERFORMANCE
+     - Policies must be fast (<100ms per evaluation)
+     - Avoid expensive operations
+     - No unbounded loops
+     - Cache computed values
+  
+  4. SECURITY
+     - Exemptions must be justified
+     - No logic errors that allow bypasses
+     - Validate all inputs
+     - Consider attacker scenarios
+  
+  5. DEVELOPER EXPERIENCE
+     - Error messages must be actionable
+     - Provide examples of correct usage
+     - Explain WHY something is blocked
+     - Include links to documentation
+  
+  SPECIFIC TO VICTORIAMETRICS POLICIES:
+  - Focus on preventing high cardinality (pod_ip, node_ip, etc.)
+  - Enforce naming conventions (level:metric:operations)
+  - Catch expensive queries (long lookback windows)
+  - Validate PromQL/MetricsQL syntax when possible
+  
+  SPECIFIC TO ROBUSTA POLICIES:
+  - Ensure alerts have routing labels (severity, team, component)
+  - Check resource limits for cost analysis
+  - Validate monitoring annotations
+  - Ensure health probes for enrichment
+
+# Tone settings
+tone_instructions: |
+  - Be direct and specific about policy issues
+  - Explain the IMPACT of violations (what breaks, what happens)
+  - Provide concrete fixes with examples
+  - For security issues, explain the risk clearly
+  - Use warnings (⚠️) for performance issues
+  - Use errors (❌) for correctness issues
+  - Use info (💡) for best practice suggestions
+
+# Additional instructions for specific file types
+file_type_instructions:
+  rego:
+    - "Validate package naming convention"
+    - "Check for METADATA block"
+    - "Ensure future.keywords are imported"
+    - "Verify violation messages are clear"
+    - "Check edge case handling"
+    - "Look for performance issues"
+    - "Validate exemption logic"
+  
+  yaml:
+    - "Check Gatekeeper constraint syntax"
+    - "Validate enforcementAction values"
+    - "Review namespace exemptions"
+    - "Check resource matching specificity"
+  
+  shell:
+    - "Ensure error handling with set -e"
+    - "Check for required command availability"
+    - "Verify user feedback is clear"
+
+# Disable specific checks
+disable_checks:
+  # Rego files can have long lines due to PromQL expressions
+  - "rego-line-too-long-in-expressions"
+
+# PR title validation
+pull_requests:
+  title_pattern: "^(feat|fix|docs|test|refactor)(\\(.+\\))?: .+"
+  title_pattern_error: |
+    PR title must follow conventional commits format:
+    feat(policy): add high cardinality detection
+    fix(tests): handle null values
+    docs: update deployment guide
+
+# Knowledge base
+knowledge_base:
+  learnings:
+    enabled: true
+    scope: "repository"
+  opt_in: true
+
+# Chat settings
+chat:
+  auto_reply: true
+
+# Example good and bad patterns
+examples:
+  good_policy: |
+    ```rego
+    package kubernetes.admission.victoriametrics.cardinality
+    
+    import future.keywords.if
+    
+    # METADATA
+    # title: High Cardinality Prevention
+    # description: Prevents creation of high-cardinality metrics
+    # severity: critical
+    # category: victoriametrics
+    # version: 1.0.0
+    
+    high_cardinality_labels := {"pod_ip", "node_ip", "instance_ip"}
+    
+    violation[{"msg": msg, "details": details}] if {
+      input.review.kind.kind in {"VMRule", "PrometheusRule"}
+      rule := input.review.object.spec.groups[_].rules[_]
+      rule.record
+      
+      contains(rule.expr, "label_replace")
+      label := high_cardinality_labels[_]
+      contains(rule.expr, label)
+      
+      msg := sprintf("Recording rule '%s' creates high-cardinality label: %s", [rule.record, label])
+      details := {
+        "rule": rule.record,
+        "label": label,
+        "impact": "This will create millions of time series"
+      }
+    }
+    ```
+  
+  bad_policy: |
+    ```rego
+    # ❌ Missing METADATA
+    # ❌ No future.keywords
+    # ❌ Generic package name
+    package test
+    
+    violation[msg] {  # ❌ No type annotation
+      rule := input.rules[_]  # ❌ Unclear path
+      not rule.labels  # ❌ Doesn't handle missing field
+      msg := "Bad rule"  # ❌ Unclear message
+    }
+    ```
+  
+  good_test: |
+    ```rego
+    test_recording_rule_with_pod_ip_denied {
+      input := {"review": {
+        "kind": {"kind": "VMRule"},
+        "object": {
+          "spec": {
+            "groups": [{
+              "rules": [{
+                "record": "test:metric:sum",
+                "expr": "label_replace(cpu, \"pod_ip\", \"$1\", \"pod\", \".*\")"
+              }]
+            }]
+          }
+        }
+      }}
+      
+      violations := violation with input as input
+      count(violations) > 0
+    }
+    
+    test_recording_rule_without_pod_ip_allowed {
+      input := {"review": {
+        "kind": {"kind": "VMRule"},
+        "object": {
+          "spec": {
+            "groups": [{
+              "rules": [{
+                "record": "namespace:cpu:sum",
+                "expr": "sum by (namespace) (cpu)"
+              }]
+            }]
+          }
+        }
+      }}
+      
+      violations := violation with input as input
+      count(violations) == 0
+    }
+    ```
