@@ -1,0 +1,5 @@
+*.bundle
+*.tar.gz
+coverage.json
+coverage/
+.DS_Store
