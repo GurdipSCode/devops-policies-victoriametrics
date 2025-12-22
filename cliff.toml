@@ -1,0 +1,51 @@
+# ggshield configuration file for scanning Terraform repos
+
+version: 1
+
+# === SECRETS DETECTION SETTINGS ===
+secret:
+  ignore-known-secrets: true          # don't alert on secrets already marked as known/ignored in workspace
+  ignore-history: false               # scan git history (set to true if you want faster CI runs)
+  verbose: false
+  exit-zero: false                    # fail the pipeline when a secret is detected
+
+# === PATHS TO SCAN / IGNORE ===
+paths:
+  # Exclude Terraform state and transient files that should never be committed
+  # (also makes scanning faster)
+  excluded:
+    - '**/.terraform/**'
+    - '**/*.tfstate'
+    - '**/*.tfstate.backup'
+    - '**/*.terraform.lock.hcl'
+    - '**/.terragrunt-cache/**'
+    - '**/*.pem'
+    - '**/*.key'
+    - '**/secrets.auto.tfvars'        # developers often keep local secrets here
+    - '**/*.tfvars'                   # optional: include only if you avoid committing any tfvars
+    - 'tmp/**'
+
+# === DETECTION TARGETS ===
+# Scan only code that matters (Terraform + YAML + scripts)
+only:
+  - '**/*.tf'
+  - '**/*.tf.json'
+  - '**/*.yaml'
+  - '**/*.yml'
+  - '**/*.sh'
+  - '**/*.ps1'
+  - '**/*.json'
+
+# === POLICIES ===
+policy:
+  # Enable additional security checks if you use GitGuardian SAST for IaC
+  iac:
+    enabled: true
+    providers:
+      - terraform
+    fail-on-cis-finding: true
+
+# === CI BEHAVIOR ===
+ci:
+  max-commits-for-history-scan: 50    # limit deep history scans for speed
+  show-secrets: false                 # don’t expose det
