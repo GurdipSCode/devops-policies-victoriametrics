@@ -1,4 +1,4 @@
-# OPA VictoriaMetrics Standards
+# devops-policies-victoriametrics
 
 [![OPA Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
