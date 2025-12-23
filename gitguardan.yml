@@ -1,0 +1,254 @@
+# GitGuardian Configuration - .NET Core / C#
+# Secret detection optimized for .NET applications
+# Place this file at the root of your repository as .gitguardian.yaml
+
+version: 2
+
+# .NET specific paths to ignore
+paths-ignore:
+  - "**/bin/**"
+  - "**/obj/**"
+  - "**/packages/**"
+  - "**/.vs/**"
+  - "**/TestResults/**"
+  - "**/*.csproj.user"
+  - "**/*.suo"
+  - "**/paket-files/**"
+  - "**/.paket/**"
+
+# Detectors - all enabled + .NET specific
+secret-scan:
+  detectors:
+    # Cloud Providers (Azure emphasis for .NET)
+    - name: Azure Storage Account Key
+      detector_group: azure
+      enabled: true
+    
+    - name: Azure Client Secret
+      detector_group: azure
+      enabled: true
+    
+    - name: Azure Cosmos DB Key
+      detector_group: azure
+      enabled: true
+    
+    - name: AWS Access Key
+      detector_group: aws
+      enabled: true
+    
+    - name: AWS Secret Key
+      detector_group: aws
+      enabled: true
+    
+    - name: GCP API Key
+      detector_group: gcp
+      enabled: true
+    
+    # Version Control
+    - name: GitHub Personal Access Token
+      detector_group: github
+      enabled: true
+    
+    - name: GitLab Personal Access Token
+      detector_group: gitlab
+      enabled: true
+    
+    # API Services
+    - name: SendGrid API Key
+      detector_group: sendgrid
+      enabled: true
+    
+    - name: Twilio API Key
+      detector_group: twilio
+      enabled: true
+    
+    - name: Stripe API Key
+      detector_group: stripe
+      enabled: true
+    
+    - name: Slack Token
+      detector_group: slack
+      enabled: true
+    
+    # Database (SQL Server emphasis)
+    - name: Database Connection String
+      detector_group: database
+      enabled: true
+    
+    - name: SQL Server Connection String
+      detector_group: database
+      enabled: true
+    
+    - name: PostgreSQL Connection String
+      detector_group: database
+      enabled: true
+    
+    - name: MongoDB Connection String
+      detector_group: database
+      enabled: true
+    
+    # Private Keys
+    - name: RSA Private Key
+      detector_group: private_key
+      enabled: true
+    
+    - name: SSH Private Key
+      detector_group: private_key
+      enabled: true
+    
+    - name: X.509 Certificate with Private Key
+      detector_group: private_key
+      enabled: true
+    
+    # Generic
+    - name: Generic High Entropy Secret
+      detector_group: generic
+      enabled: true
+    
+    - name: Generic Password
+      detector_group: generic
+      enabled: true
+    
+    - name: JWT Token
+      detector_group: generic
+      enabled: true
+    
+    - name: Basic Auth
+      detector_group: generic
+      enabled: true
+    
+    # NuGet
+    - name: NuGet API Key
+      detector_group: nuget
+      enabled: true
+
+# .NET specific exclusions
+matches-ignore:
+  # Example connection strings
+  - name: Example connection string
+    match: Server=myServerAddress;Database=myDataBase;User Id=myUsername;Password=myPassword;
+  
+  - name: LocalDB connection
+    match: (localdb)\\mssqllocaldb
+  
+  # Test/example secrets
+  - name: Test secrets
+    match: testsecret
+  
+  - name: Example secrets
+    match: examplesecret
+  
+  # Placeholder values
+  - name: Placeholders
+    match: <.*>
+  
+  - name: Configuration placeholders
+    match: YOUR_.*_HERE
+  
+  - name: User secrets placeholder
+    match: REPLACE_WITH_.*
+
+# Specific file patterns for .NET
+file-patterns:
+  # appsettings.json files (HIGH RISK)
+  - pattern: "**/appsettings*.json"
+    scan: true
+    priority: high
+    comment: "Configuration files often contain secrets"
+  
+  # Web.config (legacy .NET Framework)
+  - pattern: "**/Web.config"
+    scan: true
+    priority: high
+    comment: "Legacy config files with connection strings"
+  
+  # App.config
+  - pattern: "**/App.config"
+    scan: true
+    priority: high
+    comment: "Application configuration"
+  
+  # Environment files
+  - pattern: "**/.env*"
+    scan: true
+    priority: high
+    comment: "Environment variable files"
+  
+  # User secrets (should not be committed but scan anyway)
+  - pattern: "**/secrets.json"
+    scan: true
+    priority: critical
+    comment: "User secrets file - should NEVER be committed!"
+  
+  # launchSettings.json
+  - pattern: "**/launchSettings.json"
+    scan: true
+    priority: medium
+    comment: "Launch profiles may contain environment variables"
+  
+  # Azure publish profiles
+  - pattern: "**/*.pubxml"
+    scan: true
+    priority: critical
+    comment: "Publish profiles contain credentials"
+  
+  # Source code
+  - pattern: "**/*.cs"
+    scan: true
+    priority: medium
+    comment: "C# source code"
+  
+  - pattern: "**/*.fs"
+    scan: true
+    priority: medium
+    comment: "F# source code"
+  
+  - pattern: "**/*.vb"
+    scan: true
+    priority: medium
+    comment: "VB.NET source code"
+
+# Exit code on detection
+exit-zero: false
+
+# Output
+output:
+  format: text
+  show-secrets: false
+  
+# Reporting
+report:
+  dashboard: false
+  break-on-detection: true
+
+# .NET specific rules
+custom-rules:
+  # SQL Server connection strings
+  - name: SQL Server Password in Connection String
+    pattern: 'Password\s*=\s*[^;]+;'
+    type: connection_string
+    severity: high
+  
+  # Azure connection strings
+  - name: Azure Storage Connection String
+    pattern: 'DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[^;]+'
+    type: azure
+    severity: critical
+  
+  # API Keys in code
+  - name: Hardcoded API Key in C#
+    pattern: 'ApiKey\s*=\s*"[A-Za-z0-9]{20,}"'
+    type: api_key
+    severity: high
+  
+  # Passwords in code
+  - name: Hardcoded Password in C#
+    pattern: 'Password\s*=\s*"[^"]{8,}"'
+    type: password
+    severity: high
+  
+  # Azure Key Vault references (GOOD - don't flag)
+  - name: Azure Key Vault Reference (ALLOWED)
+    pattern: '@Microsoft\.KeyVault\(SecretUri='
+    type: allowed
+    severity: none
