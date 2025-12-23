@@ -1,51 +1,58 @@
-# ggshield configuration file for scanning Terraform repos
+# cliff.toml - git-cliff configuration
 
-version: 1
+[changelog]
+header = """
+# Changelog
 
-# === SECRETS DETECTION SETTINGS ===
-secret:
-  ignore-known-secrets: true          # don't alert on secrets already marked as known/ignored in workspace
-  ignore-history: false               # scan git history (set to true if you want faster CI runs)
-  verbose: false
-  exit-zero: false                    # fail the pipeline when a secret is detected
+All notable changes to this project will be documented in this file.
 
-# === PATHS TO SCAN / IGNORE ===
-paths:
-  # Exclude Terraform state and transient files that should never be committed
-  # (also makes scanning faster)
-  excluded:
-    - '**/.terraform/**'
-    - '**/*.tfstate'
-    - '**/*.tfstate.backup'
-    - '**/*.terraform.lock.hcl'
-    - '**/.terragrunt-cache/**'
-    - '**/*.pem'
-    - '**/*.key'
-    - '**/secrets.auto.tfvars'        # developers often keep local secrets here
-    - '**/*.tfvars'                   # optional: include only if you avoid committing any tfvars
-    - 'tmp/**'
+"""
+body = """
+{% if version %}\
+    ## [{{ version | trim_start_matches(pat="v") }}] - {{ timestamp | date(format="%Y-%m-%d") }}
+{% else %}\
+    ## [Unreleased]
+{% endif %}\
+{% for group, commits in commits | group_by(attribute="group") %}
+    ### {{ group | striptags | trim | upper_first }}
+    {% for commit in commits %}
+        - {% if commit.scope %}**{{ commit.scope }}:** {% endif %}\
+            {{ commit.message | upper_first }}\
+            {% if commit.breaking %} (**BREAKING**){% endif %}\
+    {% endfor %}
+{% endfor %}
+"""
+footer = """
+"""
+trim = true
 
-# === DETECTION TARGETS ===
-# Scan only code that matters (Terraform + YAML + scripts)
-only:
-  - '**/*.tf'
-  - '**/*.tf.json'
-  - '**/*.yaml'
-  - '**/*.yml'
-  - '**/*.sh'
-  - '**/*.ps1'
-  - '**/*.json'
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = false
+commit_parsers = [
+    { message = "^feat", group = "🚀 Features" },
+    { message = "^fix", group = "🐛 Bug Fixes" },
+    { message = "^doc", group = "📚 Documentation" },
+    { message = "^perf", group = "⚡ Performance" },
+    { message = "^refactor", group = "🔨 Refactor" },
+    { message = "^style", group = "🎨 Style" },
+    { message = "^test", group = "🧪 Testing" },
+    { message = "^chore\\(release\\)", skip = true },
+    { message = "^chore\\(deps\\)", group = "📦 Dependencies" },
+    { message = "^chore\\(ci\\)", group = "👷 CI/CD" },
+    { message = "^chore", group = "🧹 Miscellaneous" },
+    { message = "^ci", group = "👷 CI/CD" },
+    { message = "^build", group = "🏗️ Build" },
+    { message = "^revert", group = "⏪ Reverts" },
+]
+protect_breaking_commits = false
+filter_commits = false
+topo_order = false
+sort_commits = "oldest"
 
-# === POLICIES ===
-policy:
-  # Enable additional security checks if you use GitGuardian SAST for IaC
-  iac:
-    enabled: true
-    providers:
-      - terraform
-    fail-on-cis-finding: true
-
-# === CI BEHAVIOR ===
-ci:
-  max-commits-for-history-scan: 50    # limit deep history scans for speed
-  show-secrets: false                 # don’t expose det
+# tag_pattern = "v[0-9].*"
+# skip_tags = "v0.1.0-beta.1"
+# ignore_tags = ""
+# date_order = false
+# limit_commits = 42
