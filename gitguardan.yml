@@ -1,37 +1,19 @@
-# GitGuardian Configuration - .NET Core / C#
-# Secret detection optimized for .NET applications
+# GitGuardian Configuration - ArgoCD
+# Secret detection for ArgoCD GitOps repositories
 # Place this file at the root of your repository as .gitguardian.yaml
 
 version: 2
 
-# .NET specific paths to ignore
+# ArgoCD specific paths to ignore
 paths-ignore:
-  - "**/bin/**"
-  - "**/obj/**"
-  - "**/packages/**"
-  - "**/.vs/**"
-  - "**/TestResults/**"
-  - "**/*.csproj.user"
-  - "**/*.suo"
-  - "**/paket-files/**"
-  - "**/.paket/**"
+  - "**/.git/**"
+  - "**/node_modules/**"
+  - "**/.argocd/**"
 
-# Detectors - all enabled + .NET specific
+# Detectors - emphasizing secrets commonly found in ArgoCD repos
 secret-scan:
   detectors:
-    # Cloud Providers (Azure emphasis for .NET)
-    - name: Azure Storage Account Key
-      detector_group: azure
-      enabled: true
-    
-    - name: Azure Client Secret
-      detector_group: azure
-      enabled: true
-    
-    - name: Azure Cosmos DB Key
-      detector_group: azure
-      enabled: true
-    
+    # Cloud Providers
     - name: AWS Access Key
       detector_group: aws
       enabled: true
@@ -44,8 +26,24 @@ secret-scan:
       detector_group: gcp
       enabled: true
     
-    # Version Control
+    - name: GCP Service Account Key
+      detector_group: gcp
+      enabled: true
+    
+    - name: Azure Storage Account Key
+      detector_group: azure
+      enabled: true
+    
+    - name: Azure Client Secret
+      detector_group: azure
+      enabled: true
+    
+    # Version Control (for repository access)
     - name: GitHub Personal Access Token
+      detector_group: github
+      enabled: true
+    
+    - name: GitHub App Token
       detector_group: github
       enabled: true
     
@@ -53,7 +51,19 @@ secret-scan:
       detector_group: gitlab
       enabled: true
     
+    - name: GitLab Pipeline Token
+      detector_group: gitlab
+      enabled: true
+    
     # API Services
+    - name: Slack Token
+      detector_group: slack
+      enabled: true
+    
+    - name: Slack Webhook URL
+      detector_group: slack
+      enabled: true
+    
     - name: SendGrid API Key
       detector_group: sendgrid
       enabled: true
@@ -66,16 +76,8 @@ secret-scan:
       detector_group: stripe
       enabled: true
     
-    - name: Slack Token
-      detector_group: slack
-      enabled: true
-    
-    # Database (SQL Server emphasis)
+    # Database
     - name: Database Connection String
-      detector_group: database
-      enabled: true
-    
-    - name: SQL Server Connection String
       detector_group: database
       enabled: true
     
@@ -83,8 +85,21 @@ secret-scan:
       detector_group: database
       enabled: true
     
+    - name: MySQL Connection String
+      detector_group: database
+      enabled: true
+    
     - name: MongoDB Connection String
       detector_group: database
+      enabled: true
+    
+    # Container Registry
+    - name: Docker Hub Token
+      detector_group: docker
+      enabled: true
+    
+    - name: Docker Registry Auth
+      detector_group: docker
       enabled: true
     
     # Private Keys
@@ -96,7 +111,11 @@ secret-scan:
       detector_group: private_key
       enabled: true
     
-    - name: X.509 Certificate with Private Key
+    - name: TLS Private Key
+      detector_group: private_key
+      enabled: true
+    
+    - name: X.509 Certificate Private Key
       detector_group: private_key
       enabled: true
     
@@ -116,139 +135,213 @@ secret-scan:
     - name: Basic Auth
       detector_group: generic
       enabled: true
-    
-    # NuGet
-    - name: NuGet API Key
-      detector_group: nuget
-      enabled: true
 
-# .NET specific exclusions
+# ArgoCD-specific exclusions
 matches-ignore:
-  # Example connection strings
-  - name: Example connection string
-    match: Server=myServerAddress;Database=myDataBase;User Id=myUsername;Password=myPassword;
+  # Sealed Secrets (encrypted - OK)
+  - name: Sealed Secret encrypted data
+    match: 'encryptedData:'
   
-  - name: LocalDB connection
-    match: (localdb)\\mssqllocaldb
-  
-  # Test/example secrets
-  - name: Test secrets
-    match: testsecret
-  
-  - name: Example secrets
-    match: examplesecret
+  # External Secrets references (OK)
+  - name: External Secret reference
+    match: 'secretStoreRef:'
   
   # Placeholder values
   - name: Placeholders
-    match: <.*>
+    match: '<.*>'
   
-  - name: Configuration placeholders
-    match: YOUR_.*_HERE
+  - name: Template variables
+    match: '\{\{.*\}\}'
   
-  - name: User secrets placeholder
-    match: REPLACE_WITH_.*
+  - name: ArgoCD template syntax
+    match: '\$\{.*\}'
+  
+  # Example secrets
+  - name: Example tokens
+    match: 'your-token-here'
+  
+  - name: Example passwords
+    match: '(changeme|password123|example)'
 
-# Specific file patterns for .NET
+# File patterns for ArgoCD
 file-patterns:
-  # appsettings.json files (HIGH RISK)
-  - pattern: "**/appsettings*.json"
+  # ArgoCD Application manifests (HIGH RISK)
+  - pattern: "**/applications/**/*.yaml"
     scan: true
-    priority: high
-    comment: "Configuration files often contain secrets"
+    priority: critical
+    comment: "ArgoCD Application definitions"
   
-  # Web.config (legacy .NET Framework)
-  - pattern: "**/Web.config"
+  - pattern: "**/apps/**/*.yaml"
     scan: true
-    priority: high
-    comment: "Legacy config files with connection strings"
+    priority: critical
+    comment: "Application manifests"
   
-  # App.config
-  - pattern: "**/App.config"
+  # ApplicationSets
+  - pattern: "**/applicationsets/**/*.yaml"
     scan: true
     priority: high
-    comment: "Application configuration"
+    comment: "ApplicationSet manifests"
+  
+  # ArgoCD Projects
+  - pattern: "**/projects/**/*.yaml"
+    scan: true
+    priority: high
+    comment: "ArgoCD Project definitions"
+  
+  # Helm values files (VERY HIGH RISK)
+  - pattern: "**/values*.yaml"
+    scan: true
+    priority: critical
+    comment: "Helm values files - common location for secrets!"
+  
+  - pattern: "**/values/**/*.yaml"
+    scan: true
+    priority: critical
+    comment: "Helm values directory"
+  
+  # Kustomize files
+  - pattern: "**/kustomization.yaml"
+    scan: true
+    priority: high
+    comment: "Kustomize configuration"
+  
+  - pattern: "**/kustomize/**/*.yaml"
+    scan: true
+    priority: high
+    comment: "Kustomize overlays/bases"
+  
+  # Kubernetes manifests
+  - pattern: "**/*.yaml"
+    scan: true
+    priority: medium
+    comment: "All YAML files (Kubernetes manifests)"
+  
+  # Secrets (should be sealed, but scan anyway)
+  - pattern: "**/secrets/**/*.yaml"
+    scan: true
+    priority: critical
+    comment: "Secrets directory - MUST be encrypted!"
+  
+  # Sealed Secrets (scan to ensure properly encrypted)
+  - pattern: "**/sealed-secrets/**/*.yaml"
+    scan: true
+    priority: low
+    comment: "Sealed secrets - verify encryption"
+  
+  # External Secrets
+  - pattern: "**/external-secrets/**/*.yaml"
+    scan: true
+    priority: low
+    comment: "External secret references"
+  
+  # ConfigMaps (sometimes contain secrets by mistake)
+  - pattern: "**/configmaps/**/*.yaml"
+    scan: true
+    priority: medium
+    comment: "ConfigMaps may accidentally contain secrets"
   
   # Environment files
   - pattern: "**/.env*"
     scan: true
-    priority: high
-    comment: "Environment variable files"
-  
-  # User secrets (should not be committed but scan anyway)
-  - pattern: "**/secrets.json"
-    scan: true
     priority: critical
-    comment: "User secrets file - should NEVER be committed!"
-  
-  # launchSettings.json
-  - pattern: "**/launchSettings.json"
-    scan: true
-    priority: medium
-    comment: "Launch profiles may contain environment variables"
-  
-  # Azure publish profiles
-  - pattern: "**/*.pubxml"
-    scan: true
-    priority: critical
-    comment: "Publish profiles contain credentials"
-  
-  # Source code
-  - pattern: "**/*.cs"
-    scan: true
-    priority: medium
-    comment: "C# source code"
-  
-  - pattern: "**/*.fs"
-    scan: true
-    priority: medium
-    comment: "F# source code"
-  
-  - pattern: "**/*.vb"
-    scan: true
-    priority: medium
-    comment: "VB.NET source code"
+    comment: "Environment files"
 
-# Exit code on detection
+# Exit code
 exit-zero: false
 
 # Output
 output:
   format: text
   show-secrets: false
-  
+
 # Reporting
 report:
   dashboard: false
   break-on-detection: true
 
-# .NET specific rules
+# ArgoCD-specific custom rules
 custom-rules:
-  # SQL Server connection strings
-  - name: SQL Server Password in Connection String
-    pattern: 'Password\s*=\s*[^;]+;'
-    type: connection_string
-    severity: high
-  
-  # Azure connection strings
-  - name: Azure Storage Connection String
-    pattern: 'DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey=[^;]+'
-    type: azure
+  # Secrets in Helm values
+  - name: Password in Helm Values
+    pattern: '^\s*password:\s*["\']?[^"\'\s]{8,}'
+    type: password
     severity: critical
   
-  # API Keys in code
-  - name: Hardcoded API Key in C#
-    pattern: 'ApiKey\s*=\s*"[A-Za-z0-9]{20,}"'
+  - name: API Key in Helm Values
+    pattern: '^\s*apiKey:\s*["\']?[A-Za-z0-9]{20,}'
     type: api_key
-    severity: high
+    severity: critical
   
-  # Passwords in code
-  - name: Hardcoded Password in C#
-    pattern: 'Password\s*=\s*"[^"]{8,}"'
+  # Secrets in ArgoCD Application spec
+  - name: Secret in Application Values
+    pattern: 'helm:\s+values:\s+\|.*password:\s*[^$]'
     type: password
-    severity: high
+    severity: critical
   
-  # Azure Key Vault references (GOOD - don't flag)
-  - name: Azure Key Vault Reference (ALLOWED)
-    pattern: '@Microsoft\.KeyVault\(SecretUri='
-    type: allowed
-    severity: none
+  # Database URLs in values
+  - name: Database URL with Password
+    pattern: '(postgres|mysql|mongodb)://[^:]+:[^@]+@'
+    type: connection_string
+    severity: critical
+  
+  # AWS credentials in values
+  - name: AWS Credentials in Values
+    pattern: '(accessKeyId|secretAccessKey):\s*["\']?[A-Z0-9]{16,}'
+    type: aws
+    severity: critical
+  
+  # GitHub tokens in values
+  - name: GitHub Token in Values
+    pattern: '(github_token|githubToken):\s*["\']?(ghp_|github_pat_)[A-Za-z0-9_]+'
+    type: github
+    severity: critical
+  
+  # Private keys in ConfigMaps/Secrets
+  - name: Private Key in Manifest
+    pattern: '^\s+[a-z-]*key:\s*\|?\s*-----BEGIN.*PRIVATE KEY-----'
+    type: private_key
+    severity: critical
+  
+  # Docker registry credentials
+  - name: Docker Registry Password
+    pattern: '\.dockerconfigjson:\s*.*"auth":\s*"[A-Za-z0-9+/=]+"'
+    type: docker
+    severity: critical
+  
+  # TLS certificates with keys
+  - name: TLS Private Key
+    pattern: 'tls\.key:\s*\|?\s*-----BEGIN.*PRIVATE KEY-----'
+    type: private_key
+    severity: critical
+
+# Allowed patterns (good practices in ArgoCD)
+allowed-patterns:
+  # Sealed Secrets (encrypted data - GOOD)
+  - name: Sealed Secret encrypted data
+    pattern: 'encryptedData:\s*\n\s+\w+:\s+Ag[A-Za-z0-9+/=]+'
+    comment: "Encrypted by kubeseal - safe"
+  
+  # External Secrets references (GOOD)
+  - name: External Secret reference
+    pattern: 'kind:\s+ExternalSecret'
+    comment: "Using External Secrets Operator - safe"
+  
+  # Secret references in values (GOOD)
+  - name: Existing secret reference
+    pattern: 'existingSecret:\s+[a-z0-9-]+'
+    comment: "Referencing existing secret - good practice"
+  
+  # Vault references (GOOD)
+  - name: Vault path reference
+    pattern: '<path:[^>]+>'
+    comment: "Vault secret reference - safe"
+  
+  # Secret key references (GOOD)
+  - name: Secret key reference
+    pattern: 'secretKeyRef:\s*\n\s+name:'
+    comment: "Kubernetes secret reference - safe"
+  
+  # ConfigMap references (GOOD)
+  - name: ConfigMap reference
+    pattern: 'configMapKeyRef:\s*\n\s+name:'
+    comment: "ConfigMap reference - safe"
